@@ -751,29 +751,6 @@ def lymphly_classify(maf, cna_gene, annotation, feature_table, use_translocation
 
     return lymphly_table_subtype
 
-def subtype_statistics(lymphly_table, feature_table, top):
-    def to_percent(count):
-        return f'{count / len(lymphly_table) * 100:.2f}%'
-    lymphly_statistics={}
-    subtypes = get_unique_subtype(feature_table)
-    for level in config['feature_levels']:
-        lymphly_statistics[f'{level}_subtypes_assignment'] = pd.Series(index=subtypes, dtype='int')
-        lymphly_statistics[f'{level}_subtypes_assignment'] = lymphly_table[[f'{level}_{col}' for col in subtypes]].astype(bool).sum(axis=0)
-        lymphly_statistics[f'{level}_subtypes_assignment'].at['Other'] = (lymphly_table[f'{level}_subtype'] == 'Other').sum()
-        lymphly_statistics[f'{level}_features'] = pd.Series(dtype='int')
-        lymphly_statistics[f'{level}_features'] = lymphly_table[f'{level}_mol_findings'].apply(lambda x: x.split('/')).explode().map(str.strip).loc[lambda x: x != ''].value_counts()
-    for level in config['feature_levels']:
-        print(f'{level} subtypes:')
-        for subtype in lymphly_statistics[f'{level}_subtypes_assignment'].index:
-            subtype_count = lymphly_statistics[f'{level}_subtypes_assignment'].loc[subtype]
-            if subtype == 'Other':
-                print(f"\t{subtype_count} ({to_percent(subtype_count)}) of samples remained unclassified (assigned to the 'Other' subgroup)")
-            else:
-                print(f"\t{subtype_count} ({to_percent(subtype_count)}) of samples assigned to the {subtype}, including mixed")
-        print(f'\n\nList of the occurring features for {level} subtypes:')
-        print(lymphly_statistics[f'{level}_features'].iloc[0:top])
-        print('\n')
-
 def pallete_preparation(lymphly_table, palette):
     unique_subtypes = set(lymphly_table.Lymphly)
     def mix_colors(colors):

@@ -389,10 +389,10 @@ def finalize_subtype(lymphly_table, mutated_genes, subtypes, use_statuses, **kwa
     dependent_statuses = kwargs.get('dependent_statuses')
 
     lymphly_table_subtype = lymphly_table.copy()
-    cols = ['Lymphly'] + dependent_statuses + ['Decision_Features', 'Algorithm_Step']
+    cols = ['Lymphly'] + subtypes + ['Decision_Features', 'Algorithm_Step']
 
     for col in cols[::-1]:
-        if col in dependent_statuses:
+        if col in subtypes:
             lymphly_table_subtype.insert(0, col, 'No')
         else:
             lymphly_table_subtype.insert(0, col, None)
@@ -612,10 +612,24 @@ def finalize_subtype(lymphly_table, mutated_genes, subtypes, use_statuses, **kwa
                 statuses = statuse_subtypes['Extended'][sample]
                 if statuses:
                     for status in statuses:
-                        lymphly_table_subtype.loc[sample, status] = 'Yes'
+                        #lymphly_table_subtype.loc[sample, status] = 'Yes'
                         decision_extended = lymphly_table_subtype.loc[sample,'Extended_mol_findings'][status]
                         lymphly_table_subtype.at[sample, 'Decision_Features'] = lymphly_table_subtype.at[sample, 'Decision_Features'] + decision_extended
                         
+    for subtype in subtypes:
+        core_col = f"Core_{subtype}"
+        ext_col = f"Extended_{subtype}"
+        target_col = subtype
+
+        cols_to_sum = []
+        if core_col in lymphly_table.columns:
+            cols_to_sum.append(lymphly_table[core_col])
+        if ext_col in lymphly_table.columns:
+            cols_to_sum.append(lymphly_table[ext_col])
+
+        total = sum(cols_to_sum)
+        mask = total > 0
+        lymphly_table_subtype.loc[mask, target_col] = "Yes"
     
     def flatten_all_values(d):
         if isinstance(d, dict):
@@ -707,7 +721,6 @@ def lymphly_classify(maf, cna_gene, annotation, feature_table, use_translocation
         level_subtypes = get_unique_subtype(feature_table_level)
         lymphly_table_level = pd.DataFrame(0, index=samples_to_classify, columns=level_subtypes)
         lymphly_table_level[f'{level}_mol_findings'] = pd.Series(0, index=lymphly_table_level.index, dtype='object')
-        #lymphly_table_level[f'{level}_subtype'] = pd.Series(0, index=lymphly_table_level.index, dtype='object')
 
         # Iterative feature search
         for _, feature_attrs in feature_table_level.iterrows():
@@ -735,10 +748,6 @@ def lymphly_classify(maf, cna_gene, annotation, feature_table, use_translocation
                     current_dict[subtype].append(feature_entry)
                     lymphly_table_level.at[sample, f'{level}_mol_findings'] = current_dict
 
-        # Calculate lymphly subtype
-        #lymphly_table_level[f'{level}_subtype'] = lymphly_table_level[level_subtypes].astype(bool).apply(
-        #    lambda row: '/'.join(row.index[row]) if row.any() else 'Other', axis=1
-        #)
         lymphly_table_level.rename(
             columns={col: f'{level}_{col}' for col in subtypes},
             inplace=True

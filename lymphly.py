@@ -389,7 +389,13 @@ def finalize_subtype(lymphly_table, mutated_genes, subtypes, use_statuses, **kwa
     dependent_statuses = kwargs.get('dependent_statuses')
 
     lymphly_table_subtype = lymphly_table.copy()
-    lymphly_table_subtype['Lymphly'] = None
+    cols = ['Lymphly'] + dependent_statuses + ['Decision_Features', 'Algorithm_Step']
+
+    for col in cols[::-1]:
+        if col in dependent_statuses:
+            lymphly_table_subtype.insert(0, col, 'No')
+        else:
+            lymphly_table_subtype.insert(0, col, None)
     
     mutated_unique_genes_subtypes = {
         level: {
@@ -422,7 +428,7 @@ def finalize_subtype(lymphly_table, mutated_genes, subtypes, use_statuses, **kwa
         for level, samples in mutated_genes.items()
     }
     
-    ### Zero mutation to other
+    ### Zero features to other
     for sample in lymphly_table_subtype[lymphly_table_subtype.Lymphly.isna()].index:
         core_subtypes = mutated_genes_subtypes['Core'][sample]
         extended_subtypes = mutated_genes_subtypes['Extended'][sample]
@@ -432,6 +438,7 @@ def finalize_subtype(lymphly_table, mutated_genes, subtypes, use_statuses, **kwa
         all_subtypes = core_subtypes + extended_subtypes + statuses
         if not all_subtypes:
             lymphly_table_subtype.loc[sample, 'Lymphly'] = 'Other'
+            lymphly_table_subtype.loc[sample, 'Algorithm_Step'] = 'No features'
 
     ### Dominant core subtypes    
     for sample in lymphly_table_subtype[lymphly_table_subtype.Lymphly.isna()].index:
@@ -441,6 +448,9 @@ def finalize_subtype(lymphly_table, mutated_genes, subtypes, use_statuses, **kwa
             if (gene_to_subtype_count == gene_to_subtype_count.max()).sum() == 1:
                 top_subtype = gene_to_subtype_count.idxmax()
                 lymphly_table_subtype.loc[sample, 'Lymphly'] = top_subtype
+                decision_core = lymphly_table_subtype.loc[sample,'Core_mol_findings'][top_subtype]
+                lymphly_table_subtype.at[sample, 'Decision_Features'] = decision_core
+                lymphly_table_subtype.loc[sample, 'Algorithm_Step'] = 'Core genes'
 
     ### Dominant all subtypes (extended support core)
     for sample in lymphly_table_subtype[lymphly_table_subtype.Lymphly.isna()].index:
@@ -452,6 +462,10 @@ def finalize_subtype(lymphly_table, mutated_genes, subtypes, use_statuses, **kwa
             if (gene_to_subtype_count == gene_to_subtype_count.max()).sum() == 1:
                 top_subtype = gene_to_subtype_count.idxmax()
                 lymphly_table_subtype.loc[sample, 'Lymphly'] = top_subtype
+                decision_core = lymphly_table_subtype.loc[sample,'Core_mol_findings'][top_subtype]
+                decision_extended = lymphly_table_subtype.loc[sample,'Extended_mol_findings'][top_subtype]
+                lymphly_table_subtype.at[sample, 'Decision_Features'] = decision_core+decision_extended
+                lymphly_table_subtype.loc[sample, 'Algorithm_Step'] = 'Core+extended genes'
                 
     ### Dominant extended subtypes    
     for sample in lymphly_table_subtype[lymphly_table_subtype.Lymphly.isna()].index:
@@ -463,6 +477,9 @@ def finalize_subtype(lymphly_table, mutated_genes, subtypes, use_statuses, **kwa
                 if (gene_to_subtype_count == gene_to_subtype_count.max()).sum() == 1:
                     top_subtype = gene_to_subtype_count.idxmax()
                     lymphly_table_subtype.loc[sample, 'Lymphly'] = top_subtype
+                    decision_extended = lymphly_table_subtype.loc[sample,'Extended_mol_findings'][top_subtype]
+                    lymphly_table_subtype.at[sample, 'Decision_Features'] = decision_extended
+                    lymphly_table_subtype.loc[sample, 'Algorithm_Step'] = 'Extended genes'
 
     ### Dominant core subtypes (by mutations, not genes)
     for sample in lymphly_table_subtype[lymphly_table_subtype.Lymphly.isna()].index:
@@ -472,6 +489,9 @@ def finalize_subtype(lymphly_table, mutated_genes, subtypes, use_statuses, **kwa
             if (gene_to_subtype_count == gene_to_subtype_count.max()).sum() == 1:
                 top_subtype = gene_to_subtype_count.idxmax()
                 lymphly_table_subtype.loc[sample, 'Lymphly'] = top_subtype
+                decision_core = lymphly_table_subtype.loc[sample,'Core_mol_findings'][top_subtype]
+                lymphly_table_subtype.at[sample, 'Decision_Features'] = decision_core
+                lymphly_table_subtype.loc[sample, 'Algorithm_Step'] = 'Core mutations'
 
     ### Dominant all subtypes (extended support core, by mutations, not genes)
     for sample in lymphly_table_subtype[lymphly_table_subtype.Lymphly.isna()].index:
@@ -483,6 +503,10 @@ def finalize_subtype(lymphly_table, mutated_genes, subtypes, use_statuses, **kwa
             if (gene_to_subtype_count == gene_to_subtype_count.max()).sum() == 1:
                 top_subtype = gene_to_subtype_count.idxmax()
                 lymphly_table_subtype.loc[sample, 'Lymphly'] = top_subtype
+                decision_core = lymphly_table_subtype.loc[sample,'Core_mol_findings'][top_subtype]
+                decision_extended = lymphly_table_subtype.loc[sample,'Extended_mol_findings'][top_subtype]
+                lymphly_table_subtype.at[sample, 'Decision_Features'] = decision_core+decision_extended
+                lymphly_table_subtype.loc[sample, 'Algorithm_Step'] = 'Core+extended mutations'
     
     ### Dominant extended subtypes (by mutations, not genes)
     for sample in lymphly_table_subtype[lymphly_table_subtype.Lymphly.isna()].index:
@@ -494,6 +518,9 @@ def finalize_subtype(lymphly_table, mutated_genes, subtypes, use_statuses, **kwa
                 if (gene_to_subtype_count == gene_to_subtype_count.max()).sum() == 1:
                     top_subtype = gene_to_subtype_count.idxmax()
                     lymphly_table_subtype.loc[sample, 'Lymphly'] = top_subtype
+                    decision_extended = lymphly_table_subtype.loc[sample,'Extended_mol_findings'][top_subtype]
+                    lymphly_table_subtype.at[sample, 'Decision_Features'] = decision_extended
+                    lymphly_table_subtype.loc[sample, 'Algorithm_Step'] = 'Extended mutations'
     
     ### Presence among core features
     for sample in lymphly_table_subtype[lymphly_table_subtype.Lymphly.isna()].index:
@@ -514,20 +541,27 @@ def finalize_subtype(lymphly_table, mutated_genes, subtypes, use_statuses, **kwa
                 abc_main = any(s in main_abc_subtypes for s in abc_present)
                 gcb_main = any(s in main_gcb_subtypes for s in gcb_present)
                 if abc_main and gcb_main:
-                    selected_subtype = f'{gcb_present[0]}/{abc_present[0]}'
+                    selected_subtype = [gcb_present[0],abc_present[0]]
                 elif abc_main and not gcb_main:
                     selected_subtype = abc_present[0]
                 elif not abc_main and gcb_main:
                     selected_subtype = gcb_present[0]
                 else:
-                    selected_subtype = f'{gcb_present[0]}/{abc_present[0]}'
+                    selected_subtype = [gcb_present[0],abc_present[0]]
             if selected_subtype:
-                lymphly_table_subtype.loc[sample, 'Lymphly'] = selected_subtype
+                lymphly_table_subtype.loc[sample, 'Algorithm_Step'] = 'Hierarchy core'
+                if isinstance(selected_subtype, list):
+                    lymphly_table_subtype.at[sample, 'Decision_Features'] = sum([lymphly_table_subtype.loc[sample, 'Core_mol_findings'][st] for st in selected_subtype], [])
+                    lymphly_table_subtype.loc[sample, 'Lymphly'] = '/'.join(sorted(selected_subtype))
+                else:
+                    lymphly_table_subtype.at[sample, 'Decision_Features'] = lymphly_table_subtype.loc[sample,'Core_mol_findings'][selected_subtype]
+                    lymphly_table_subtype.loc[sample, 'Lymphly'] = selected_subtype
 
     ### Presence among extended features
     for sample in lymphly_table_subtype[lymphly_table_subtype.Lymphly.isna()].index:
         extended_subtypes = mutated_unique_genes_subtypes['Extended'][sample]
         if extended_subtypes:
+            lymphly_table_subtype.loc[sample, 'Algorithm_Step'] = 'Hierarchy extended'
             gene_to_subtype_count = pd.Series(extended_subtypes).value_counts()
             max_count = gene_to_subtype_count.max()
             top_values = gene_to_subtype_count[gene_to_subtype_count == max_count].index
@@ -543,40 +577,59 @@ def finalize_subtype(lymphly_table, mutated_genes, subtypes, use_statuses, **kwa
                 abc_main = any(s in main_abc_subtypes for s in abc_present)
                 gcb_main = any(s in main_gcb_subtypes for s in gcb_present)
                 if abc_main and gcb_main:
-                    selected_subtype = f'{gcb_present[0]}/{abc_present[0]}'
+                    selected_subtype = [gcb_present[0],abc_present[0]]
                 elif abc_main and not gcb_main:
                     selected_subtype = abc_present[0]
                 elif not abc_main and gcb_main:
                     selected_subtype = gcb_present[0]
                 else:
-                    selected_subtype = f'{gcb_present[0]}/{abc_present[0]}'
+                    selected_subtype = [gcb_present[0],abc_present[0]]
             if selected_subtype:
-                lymphly_table_subtype.loc[sample, 'Lymphly'] = selected_subtype
+                if isinstance(selected_subtype, list):
+                    lymphly_table_subtype.at[sample, 'Decision_Features'] = sum([lymphly_table_subtype.loc[sample, 'Extended_mol_findings'][st] for st in selected_subtype], [])
+                    lymphly_table_subtype.loc[sample, 'Lymphly'] = '/'.join(sorted(selected_subtype))
+                else:
+                    lymphly_table_subtype.at[sample, 'Decision_Features'] = lymphly_table_subtype.loc[sample,'Extended_mol_findings'][selected_subtype]
+                    lymphly_table_subtype.loc[sample, 'Lymphly'] = selected_subtype
     
     ### Only statuses
     for sample in lymphly_table_subtype[lymphly_table_subtype.Lymphly.isna()].index:
         core_subtypes = mutated_genes_subtypes['Core'][sample]
         extended_subtypes = mutated_unique_genes_subtypes['Extended'][sample]
         all_subtypes = core_subtypes + extended_subtypes
-        core_statuses = statuse_subtypes['Core'][sample]
-        extended_statuses = statuse_subtypes['Extended'][sample]
-        statuses = set(core_statuses + extended_statuses)
+        statuses = statuse_subtypes['Extended'][sample]
         if not all_subtypes and statuses:
-            lymphly_table_subtype.loc[sample, 'Lymphly'] = '/'.join(statuses)
+            lymphly_table_subtype.at[sample, 'Decision_Features'] = sum([lymphly_table_subtype.loc[sample, 'Extended_mol_findings'][st] for st in statuses], [])
+            lymphly_table_subtype.loc[sample, 'Lymphly'] = '/'.join(sorted(statuses))
+            lymphly_table_subtype.loc[sample, statuses] = 'Yes'
+            lymphly_table_subtype.loc[sample, 'Algorithm_Step'] = 'Only statuses'
         
     ### Add statuses
     if use_statuses:
         for sample in lymphly_table_subtype.index:
             skip_subtypes = ['Other'] + list(dependent_statuses)
             if not any(s in skip_subtypes for s in lymphly_table_subtype.loc[sample, 'Lymphly'].split('/')):
-                core_statuses = statuse_subtypes['Core'][sample]
-                extended_statuses = statuse_subtypes['Extended'][sample]
-                statuses = set(core_statuses + extended_statuses)
+                statuses = statuse_subtypes['Extended'][sample]
                 if statuses:
-                    for statuse in statuses:
-                        if statuse not in lymphly_table_subtype.loc[sample, 'Lymphly'].split('/'):
-                            lymphly_table_subtype.loc[sample, 'Lymphly'] = '-'.join([lymphly_table_subtype.loc[sample, 'Lymphly'], statuse])
+                    for status in statuses:
+                        lymphly_table_subtype.loc[sample, status] = 'Yes'
+                        decision_extended = lymphly_table_subtype.loc[sample,'Extended_mol_findings'][status]
+                        lymphly_table_subtype.at[sample, 'Decision_Features'] = lymphly_table_subtype.at[sample, 'Decision_Features'] + decision_extended
+                        
+    
+    def flatten_all_values(d):
+        if isinstance(d, dict):
+            combined = sum(d.values(), [])
+            return '/'.join(combined)
+        return d
 
+    for col in ['Core_mol_findings', 'Extended_mol_findings']:
+        lymphly_table_subtype[col] = lymphly_table_subtype[col].apply(flatten_all_values)    
+    
+    lymphly_table_subtype['Decision_Features'] = lymphly_table_subtype['Decision_Features'].apply(
+        lambda x: '/'.join(x) if isinstance(x, list) else x
+    )
+    
     return lymphly_table_subtype
 
 def get_unique_subtype(feature_table):
@@ -648,12 +701,13 @@ def lymphly_classify(maf, cna_gene, annotation, feature_table, use_translocation
 
     # Process each level (Core/Extended)
     for level in feature_levels:
-
+	
         # Create table of features and subtypes
         feature_table_level = feature_table[feature_table.Level == level].copy()
-        lymphly_table_level = pd.DataFrame(0, index=samples_to_classify, columns=subtypes)
+        level_subtypes = get_unique_subtype(feature_table_level)
+        lymphly_table_level = pd.DataFrame(0, index=samples_to_classify, columns=level_subtypes)
         lymphly_table_level[f'{level}_mol_findings'] = pd.Series(0, index=lymphly_table_level.index, dtype='object')
-        lymphly_table_level[f'{level}_subtype'] = pd.Series(0, index=lymphly_table_level.index, dtype='object')
+        #lymphly_table_level[f'{level}_subtype'] = pd.Series(0, index=lymphly_table_level.index, dtype='object')
 
         # Iterative feature search
         for _, feature_attrs in feature_table_level.iterrows():
@@ -671,17 +725,20 @@ def lymphly_classify(maf, cna_gene, annotation, feature_table, use_translocation
                 lymphly_table_level.loc[sample_counts.index, subtype] += sample_counts
                 for sample, count in sample_counts.items():
                     mutated_genes[level][sample].append(f"{feature_attrs['Gene']}_{feature_attrs['Subtype']}")
-                    current_value = lymphly_table_level.loc[sample, f'{level}_mol_findings']
-                    formatted_finding = f'{count}*{feature_id}' if count > 1 else feature_id
-                    lymphly_table_level.loc[sample, f'{level}_mol_findings'] = (
-                        formatted_finding if current_value == 0
-                        else f'{current_value}/{formatted_finding}'
-                    )
+                    current_dict = lymphly_table_level.at[sample, f'{level}_mol_findings']
+                    if not isinstance(current_dict, dict):
+                        current_dict = {}
+                    subtype = feature_attrs['Subtype']
+                    feature_entry = f"{feature_id}" if count == 1 else f"{count}*{feature_id}"
+                    if subtype not in current_dict:
+                        current_dict[subtype] = []
+                    current_dict[subtype].append(feature_entry)
+                    lymphly_table_level.at[sample, f'{level}_mol_findings'] = current_dict
 
         # Calculate lymphly subtype
-        lymphly_table_level[f'{level}_subtype'] = lymphly_table_level[subtypes].astype(bool).apply(
-            lambda row: '/'.join(row.index[row]) if row.any() else 'Other', axis=1
-        )
+        #lymphly_table_level[f'{level}_subtype'] = lymphly_table_level[level_subtypes].astype(bool).apply(
+        #    lambda row: '/'.join(row.index[row]) if row.any() else 'Other', axis=1
+        #)
         lymphly_table_level.rename(
             columns={col: f'{level}_{col}' for col in subtypes},
             inplace=True

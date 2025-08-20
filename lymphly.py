@@ -427,7 +427,7 @@ def finalize_subtype(lymphly_table, mutated_genes, subtypes, use_statuses, **kwa
         }
         for level, samples in mutated_genes.items()
     }
-    
+
     ### Zero features to other
     for sample in lymphly_table_subtype[lymphly_table_subtype.Lymphly.isna()].index:
         core_subtypes = mutated_genes_subtypes['Core'][sample]
@@ -601,28 +601,39 @@ def finalize_subtype(lymphly_table, mutated_genes, subtypes, use_statuses, **kwa
                     lymphly_table_subtype.loc[sample, 'Lymphly'] = selected_subtype
     
     ### Only statuses
-    for sample in lymphly_table_subtype[lymphly_table_subtype.Lymphly.isna()].index:
-        core_subtypes = mutated_genes_subtypes['Core'][sample]
-        extended_subtypes = mutated_unique_genes_subtypes['Extended'][sample]
+    def process_only_statuses(row):
+        core_subtypes = mutated_genes_subtypes['Core'][row.name]
+        extended_subtypes = mutated_unique_genes_subtypes['Extended'][row.name]
         all_subtypes = core_subtypes + extended_subtypes
-        statuses = statuse_subtypes['Extended'][sample]
+        statuses = statuse_subtypes['Extended'][row.name]
         if not all_subtypes and statuses:
-            lymphly_table_subtype.at[sample, 'Decision_Features'] = sum([lymphly_table_subtype.loc[sample, 'Extended_mol_findings'][st] for st in statuses], [])
-            lymphly_table_subtype.loc[sample, 'Lymphly'] = '/'.join(sorted(statuses))
-            lymphly_table_subtype.loc[sample, statuses] = 'Yes'
-            lymphly_table_subtype.loc[sample, 'Algorithm_Step'] = 'Only statuses'
-        
+            if not isinstance(row['Decision_Features'], list):
+                row['Decision_Features'] = []
+            row['Decision_Features'] = sum(
+                [row['Extended_mol_findings'][st] for st in statuses], []
+            )
+            row['Lymphly'] = '/'.join(sorted(set(statuses)))
+            row[statuses] = 'Yes'
+            row['Algorithm_Step'] = 'Only statuses'
+    
+        return row
+
+    lymphly_table_subtype = lymphly_table_subtype.apply(process_only_statuses, axis=1)
+
     ### Add statuses
+    def update_decision_features(row):
+        skip_subtypes = ['Other'] + list(dependent_statuses)
+        if not any(s in skip_subtypes for s in row['Lymphly'].split('/')):
+            statuses = statuse_subtypes['Extended'][row.name]
+            if statuses:
+                for status in statuses:
+                    decision_extended = lymphly_table.loc[row.name, 'Extended_mol_findings'][status]
+                    row['Decision_Features'] += decision_extended
+                    row[status] = 'Yes'
+        return row
+    
     if use_statuses:
-        for sample in lymphly_table_subtype.index:
-            skip_subtypes = ['Other'] + list(dependent_statuses)
-            if not any(s in skip_subtypes for s in lymphly_table_subtype.loc[sample, 'Lymphly'].split('/')):
-                statuses = statuse_subtypes['Extended'][sample]
-                if statuses:
-                    for status in statuses:
-                        lymphly_table_subtype.loc[sample, status] = 'Yes'
-                        decision_extended = lymphly_table_subtype.loc[sample,'Extended_mol_findings'][status]
-                        lymphly_table_subtype.at[sample, 'Decision_Features'] = lymphly_table_subtype.at[sample, 'Decision_Features'] + decision_extended
+        lymphly_table_subtype = lymphly_table_subtype.apply(update_decision_features, axis=1)
                         
     def flatten_all_values(d):
         if isinstance(d, dict):
@@ -632,9 +643,9 @@ def finalize_subtype(lymphly_table, mutated_genes, subtypes, use_statuses, **kwa
 
     for col in ['Core_mol_findings', 'Extended_mol_findings']:
         lymphly_table_subtype[col] = lymphly_table_subtype[col].apply(flatten_all_values)    
-    
+
     lymphly_table_subtype['Decision_Features'] = lymphly_table_subtype['Decision_Features'].apply(
-        lambda x: '/'.join(x) if isinstance(x, list) else x
+        lambda x: '/'.join(list(set(x))) if isinstance(x, list) else x
     )
     
     return lymphly_table_subtype

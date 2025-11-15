@@ -134,13 +134,13 @@ The classifier is designed to work primarily with mutation data aligned to the *
 
 ---
 
-### cna-gene.tsv — Copy Number Alteration Matrix
+### cna-gene.tsv — Copy Number Alteration Gene Matrix
 
 Tab-separated file where rows are genes and columns are samples.
 
 Each cell contains an integer copy number call, representing the relative copy number status of that gene compared to the sample’s baseline ploidy.
 
-Expected values (example schema):
+#### Expected values (example schema):
 
 - `0` — diploid (normal copy number, relative to the sample’s ploidy)
 
@@ -149,6 +149,66 @@ Expected values (example schema):
 - `-1` or `-2` — loss or deletion (reduced copy number relative to ploidy)
 
 This matrix is used to identify subtype-defining copy number alterations in specific genes.
+
+---
+
+**Note:** Negative values (-1, -2) represent copy number loss or deletion relative to the estimated ploidy of the sample. For example, if a sample has a baseline ploidy of 3, a value of -1 may indicate a reduction to 2 copies in that region.
+
+---
+
+### cna-arm.tsv — Copy Number Alteration Arm Matrix
+
+Tab-separated file where rows represent chromosome arms and columns represent samples.
+
+Each cell contains an integer copy number call, indicating the relative copy number status of a chromosome arm compared to the sample’s baseline ploidy.
+
+The cna-arm.tsv file is required to compute the arm-level aneuploidy status A+/–. If this file is not provided, the A+/– status cannot be calculated, and any downstream analyses depending on this metric will be unavailable.
+
+For each sample, any non-zero deviation from the baseline ploidy contributes +1 to the aneuploidy score. Thus, the total A+/– score equals the number of chromosome arms whose copy number differs from the sample’s ploidy
+
+A sample is considered `A+` if its score is > `14`
+
+A sample is considered `A−` if its score is ≤ `14`
+
+This functionality is available for any cohort that includes arm-level CNA calls
+
+#### Expected values (example schema):
+
+- `0` — diploid (normal copy number, relative to the sample’s ploidy)
+
+- `1` or `2` — arm-level gain or high-level amplification
+
+- `-1` or `-2` — arm-level loss or deletion
+
+This matrix is used to compute broad aneuploidy metrics, identify recurrent arm-level CNAs, and support subtype classification driven by chromosomal gains and losses.
+
+#### Allowed chromosome arm names
+
+Chromosome arms must follow the format:
+
+`{1–24}{p/q}`
+
+where:
+
+- `1–22` represent autosomes
+
+- `23` represents chromosome X
+
+- `24` represents chromosome Y
+
+Examples of valid names: 1p, 1q, 7p, 19q, 22p, 23q, 24p.
+
+#### Invalid chromosome arm names
+
+The following are not allowed:
+
+- Literal X or Y arm names (`Xp`, `Xq`, `Yp`, `Yq`)
+
+- Chromosome numbers without an arm (`1`, `7`, `23`, `24`)
+
+- Cytobands (`1p36`, `8q24`)
+
+- Any non-numeric or non-arm identifiers (e.g., contigs, scaffolds, or mitochondrial labels)
 
 ---
 

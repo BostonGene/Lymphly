@@ -12,7 +12,7 @@ config = {
     'gcb_subtypes_order': ['EZB', 'JS6'],
     'main_abc_subtypes': ['MCD', 'BN2'],
     'main_gcb_subtypes': ['EZB'],
-    'dependent_statuses': ['MYC+', 'TP53+']
+    'dependent_statuses': ['MYC+', 'TP53+', 'A+']
 }
 
 variant_classification_groups = {
@@ -30,6 +30,7 @@ palette_pure = {
     'N1': '#b8860b',
     'MYC+': '#9467bd',
     'TP53+': '#7f7f7f',
+    'A+': '#ff4500',
     'Other': '#c7c7c7'
 }
 
@@ -165,6 +166,73 @@ def format_maf(input_maf: pd.DataFrame,
     
     return maf
 
+def check_cna_arm(cna_arm: pd.DataFrame, ann: pd.DataFrame) -> pd.DataFrame:
+    """
+    Validates and filters a CNA arm matrix to ensure compatibility with annotation and feature tables.
+
+    Parameters
+    ----------
+    cna_arm : pd.DataFrame
+        DataFrame of arm-level CNA calls with chromosome arms as rows and samples as columns. 
+        Expected values are integers in [0, 1, 2, -1, -2], representing deviations from sample ploidy.
+    ann : pd.DataFrame
+        Annotation table where the index represents sample identifiers.
+
+    Returns
+    -------
+    pd.DataFrame
+        Filtered version of `cna_arm` that:
+        - Contains only valid chromosome arms `{1–24}{p/q}` (with 23 = X, 24 = Y). Raises an error if any invalid names are found.
+        - Excludes arms (`23p`, `23q`, `24p`, `24q`, `21p`, `22p`, `13p`, `14p`, `15p`).
+        - Contains only the remaining arms and all columns (samples) from the input matrix.
+        - Raises a ValueError if unexpected CNA values are found.
+
+    Raises
+    ------
+    ValueError
+        - If `cna_arm` contains values outside the allowed CNA set `{0, 1, 2, -1, -2}`.
+        - If any row index (chromosome arm) does not match the required `{1–24}{p/q}` format.
+
+    Warnings
+    --------
+    - If samples in `ann` are missing from `cna_arm`, a warning is issued.
+    - If extra samples are found in `cna_arm` but not in `ann`, they are dropped with an info message.
+    """
+    # Allowed CNA values
+    allowed_values = [0, 1, 2, -1, -2]
+    unique_vals = pd.unique(cna_arm.values.ravel()).tolist()
+    unexpected_vals = [v for v in unique_vals if v not in allowed_values]
+    if unexpected_vals:
+        raise ValueError(f'Unexpected CNA values found in cna_arm: {unexpected_vals}')
+
+    # Validate chromosome arm names
+    valid_arms = [f"{i}{arm}" for i in range(1,25) for arm in ('p','q')]
+    invalid_arms = [a for a in cna_arm.index if a not in valid_arms]
+    if invalid_arms:
+        raise ValueError(f'Invalid chromosome arms found: {invalid_arms}')
+
+    # Exclude arms
+    arms_to_exclude = ['23p','23q','24p','24q','21p','22p','13p','14p','15p']
+    arms_to_keep = cna_arm.index.difference(arms_to_exclude)
+    cna_arm_filtered = cna_arm.loc[arms_to_keep]
+
+    # Filter columns based on annotation
+    cna_cols = set(cna_arm_filtered.columns)
+    ann_idx = set(ann.index)
+
+    # Drop extra columns not in annotation
+    extra_cols = cna_cols - ann_idx
+    if extra_cols:
+        print(f'Info: Columns in cna_arm not found among the annotation samples, these will be dropped: {sorted(extra_cols)}')
+        cna_arm_filtered = cna_arm_filtered.drop(columns=extra_cols)
+
+    # Warn about missing samples in cna_arm
+    missing_cols = ann_idx - cna_cols
+    if missing_cols:
+        warnings.warn(f'Samples present in annotation but missing in cna_arm: {sorted(missing_cols)}')
+
+    return cna_arm_filtered
+
 def check_cna_gene(cna_gene: pd.DataFrame, ann: pd.DataFrame, feature_table: pd.DataFrame) -> pd.DataFrame:
     """
     Validates and filters a CNA gene matrix to ensure compatibility with annotation and feature tables.
@@ -199,7 +267,7 @@ def check_cna_gene(cna_gene: pd.DataFrame, ann: pd.DataFrame, feature_table: pd.
     - If extra samples are found in `cna_gene` but not in `ann`, they are dropped with an info message.
     """
     allowed_values = [0, 1, 2, -1, -2]
-
+    
     unique_vals = pd.unique(cna_gene.values.ravel()).tolist()
     unexpected_vals = [v for v in unique_vals if v not in allowed_values]
     if unexpected_vals:
@@ -227,7 +295,7 @@ def check_cna_gene(cna_gene: pd.DataFrame, ann: pd.DataFrame, feature_table: pd.
 
     return cna_gene_filtered
 
-def find_features(feature_attrs, variant_classifications, maf=None, cna_gene=None, sample_annot=None, features_to_samples={}, ):
+def find_features(feature_attrs, variant_classifications, maf=None, cna_gene=None, cna_arm=None, sample_annot=None, features_to_samples={}, ):
     """
     Identifies features in a mutation annotation file (MAF) based on a specific gene, its associated feature type, 
     and other relevant genomic data, and returns a list of features and associated samples.
@@ -284,6 +352,13 @@ def find_features(feature_attrs, variant_classifications, maf=None, cna_gene=Non
         samples_with_feature = list(sample_annot[sample_annot[gene].isin(['True', 'TRUE', 'true', True])].index)
         feature_id = f'{gene}_{feat_type}'
 
+    # Handle aneuploidy
+    elif feat_type == 'ANEUPLOIDY':
+        aneuploidy_treshold = int(feature_attrs['CNA_type'])
+        nonzero_counts = (cna_arm != 0).sum(axis=0)
+        samples_with_feature = nonzero_counts[nonzero_counts > aneuploidy_treshold].index.tolist()
+        feature_id = f'{feat_type}'
+        
     # Handle CNA gene events
     elif feat_type == 'CNA_GENE':
         if gene in cna_gene.index:
@@ -599,7 +674,7 @@ def finalize_subtype(lymphly_table, mutated_genes, subtypes, use_statuses, **kwa
                 else:
                     lymphly_table_subtype.at[sample, 'Decision_Features'] = lymphly_table_subtype.loc[sample,'Extended_mol_findings'][selected_subtype]
                     lymphly_table_subtype.loc[sample, 'Lymphly'] = selected_subtype
-    
+
     ### Only statuses
     def process_only_statuses(row):
         core_subtypes = mutated_genes_subtypes['Core'][row.name]
@@ -624,17 +699,18 @@ def finalize_subtype(lymphly_table, mutated_genes, subtypes, use_statuses, **kwa
     def update_decision_features(row):
         skip_subtypes = ['Other'] + list(dependent_statuses)
         if not any(s in skip_subtypes for s in row['Lymphly'].split('/')):
+            row['Decision_Features'] = row['Decision_Features'].copy()
             statuses = statuse_subtypes['Extended'][row.name]
             if statuses:
                 for status in statuses:
-                    decision_extended = lymphly_table.loc[row.name, 'Extended_mol_findings'][status]
+                    decision_extended = lymphly_table.loc[row.name, 'Extended_mol_findings'][status].copy()
                     row['Decision_Features'] += decision_extended
                     row[status] = 'Yes'
         return row
     
     if use_statuses:
         lymphly_table_subtype = lymphly_table_subtype.apply(update_decision_features, axis=1)
-                        
+        
     def flatten_all_values(d):
         if isinstance(d, dict):
             combined = sum(d.values(), [])
@@ -656,7 +732,7 @@ def get_unique_subtype(feature_table):
     with_plus = sorted([s for s in all_subtypes if '+' in s])
     return no_plus + with_plus
 
-def lymphly_classify(maf, cna_gene, annotation, feature_table, use_translocations, use_cna, use_statuses, **kwargs):
+def lymphly_classify(maf, cna_gene, cna_arm, annotation, feature_table, use_translocations, use_cna, use_statuses, **kwargs):
     """
     This function classifies samples based on mutation data and additional features like CNA,
     and generates a table with molecular findings and subtype assignments for each sample.
@@ -664,6 +740,7 @@ def lymphly_classify(maf, cna_gene, annotation, feature_table, use_translocation
     Parameters:
     - maf (pd.DataFrame): Mutation data frame, including the 'Sample' column.
     - cna_gene (pd.DataFrame): CNA gene data for classified samples.
+    - cna_arm (pd.DataFrame): CNA arm data for classified samples.
     - annotation (pd.DataFrame): Annotation table with predefined classifications.
     - feature_table (pd.DataFrame): Table of features used for classification, including mutation, CNA, etc.
     - use_translocations (bool): Whether to include translocations in the classification process.
@@ -682,6 +759,7 @@ def lymphly_classify(maf, cna_gene, annotation, feature_table, use_translocation
     main_abc_subtypes = kwargs.get('main_abc_subtypes')
     main_gcb_subtypes = kwargs.get('main_gcb_subtypes')
     dependent_statuses = kwargs.get('dependent_statuses')
+    arms_to_exclude = kwargs.get('arms_to_exclude')
 
     # Get unique subtypes
     subtypes = get_unique_subtype(feature_table)
@@ -710,6 +788,14 @@ def lymphly_classify(maf, cna_gene, annotation, feature_table, use_translocation
     else:
         print('CNAs are used in the classification.')
         cna_gene = cna_gene[[x for x in samples_to_classify if x in cna_gene.columns]]
+        
+    # If ARM is not used doesn't calculate aneuploidy status
+    if cna_arm is None:
+        feature_table = feature_table[~feature_table.Type.isin(['ANEUPLOIDY'])]
+        print('Aneuploidy are not used in the classification.')
+    else:
+        print('Aneuploidy are used in the classification.')
+        cna_arm = cna_arm[[x for x in samples_to_classify if x in cna_arm.columns]]
 
     # Create final table
     lymphly_table = maf.Sample.value_counts().to_frame('N_mutations')
@@ -732,6 +818,7 @@ def lymphly_classify(maf, cna_gene, annotation, feature_table, use_translocation
                                                                                variant_classification_groups,
                                                                                maf,
                                                                                cna_gene,
+                                                                               cna_arm,
                                                                                annotation,
                                                                                features_to_samples
                                                                                )

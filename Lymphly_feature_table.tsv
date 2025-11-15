@@ -807,6 +807,7 @@ TNFRSF14	1	2556665	2563273			1	284	FRAME_SHIFT				EZB	27693350	https://doi.org/1
 TNFRSF14	1	2556665	2563273			1	284	NONSENSE				EZB	27693350	https://doi.org/10.1016/j.cell.2016.08.032	Extended	CDS	https://genome.ucsc.edu/cgi-bin/hgGene?hgg_gene=ENST00000355716.5&db=hg38	
 TNFRSF14	1	2557781	2557781	G	A	42	42	HOTSPOT		C42Y		EZB	35834399	https://doi.org/10.1097/PAS.0000000000001932	Extended			
 TNFRSF14	1	2557813	2557813	T	G	53	53	HOTSPOT		C53G		EZB	29858685	https://doi.org/10.1007/s00428-018-2384-3	Extended			
+TP53	17							ANEUPLOIDY	14			A+			Extended			
 TP53	17	7669609	7676594			1	394	FRAME_SHIFT				TP53+	37851898	https://doi.org/10.1182/bloodadvances.2023011384	Extended	CDS	https://genome.ucsc.edu/cgi-bin/hgGene?hgg_gene=ENST00000269305.9&db=hg38	
 TP53	17	7669609	7676594			1	394	NONSENSE				TP53+	37851898	https://doi.org/10.1182/bloodadvances.2023011384	Extended	CDS	https://genome.ucsc.edu/cgi-bin/hgGene?hgg_gene=ENST00000269305.9&db=hg38	
 TP53	17	7676570	7676570	T	C	9	9	HOTSPOT		S9G		TP53+	32164171	https://doi.org/10.3390/cancers12030637	Extended			

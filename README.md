@@ -13,7 +13,7 @@ DLBCL is a genetically and clinically heterogeneous disease. **Lymphly** is a tr
 
 - Nine-step hierarchical algorithm based on core and extended genomic features
 - Classification into six subtypes: EZB, MCD, BN2, N1, JS3, JS6
-- Additional flags for high-risk cases: TP53+ and MYC+ statuses
+- Additional flags for high-risk cases: TP53+, A+, MYC+ statuses
 - Integrated biological knowledge: derived from over 300 publications and 850 genomic events
 - Handles genetically composite cases
 - Compatible with whole-exome sequencing (WES) input
@@ -31,7 +31,7 @@ DLBCL is a genetically and clinically heterogeneous disease. **Lymphly** is a tr
 | JS3    | STAT3, IL6/IL10 loops | ABC-like, PI3K activation, BCR-resistance |
 | JS6    | STAT6, PDL1 amplification | GCB-like/PMBL-like, immune evasion |
 
-Additionally, **TP53+** and **MYC+** samples are flagged due to their prognostic and therapeutic significance.
+Additionally, **TP53+**, **A+**, and **MYC+** samples are flagged due to their prognostic and therapeutic significance.
 
 ---
 
@@ -257,7 +257,7 @@ jupyter notebook Lymphly_Classifier.ipynb
 
 **Important**: Make sure the `Lymphly` environment is selected in the Jupyter Notebook interface
 
-Provide input files with mutation, CNA, and translocation information for your DLBCL samples. The notebook will classify each sample and annotate subtype and risk features (TP53+, MYC+).
+Provide input files with mutation, CNA, and translocation information for your DLBCL samples. The notebook will classify each sample and annotate subtype and risk features (TP53+, A+, MYC+).
 
 Input file paths and parameters can be specified in the notebook via the cohorts_settings dictionary, for example:
 
@@ -265,12 +265,13 @@ Input file paths and parameters can be specified in the notebook via the cohorts
 cohorts_settings = {
     'path_to_maf': 'test_data/mutations.maf',
     'path_to_cna_gene': 'test_data/cna-gene.tsv',
+    'path_to_cna_arm': 'test_data/cna-arm.tsv',
     'path_to_annotation': 'test_data/annotation.tsv',
     'name_to_save': 'test_data/Lymphly_test.tsv',
     'ref': 'HG38'
 }
 ```
-The fields `path_to_maf`, `path_to_cna_gene`, and `path_to_annotation` should contain paths to input files formatted as described in the *Input File Specifications* section.  
+The fields `path_to_maf`, `path_to_cna_gene`, 'path_to_cna_arm', and `path_to_annotation` should contain paths to input files formatted as described in the *Input File Specifications* section.  
 `name_to_save` is the output path for the resulting classifier file.  
 `ref` specifies the reference genome used in the input MAF file (either `HG38` or `HG19`).
 
@@ -281,7 +282,7 @@ Set additional parameters to control classification behavior:
 - `USE_CNA`
 - `USE_STATUSES`
 
-Modify these parameters as needed to enable or disable usage of translocations, copy number alterations, and status flags (**TP53+** and **MYC+**) during classification.
+Modify these parameters as needed to enable or disable usage of translocations, copy number alterations, and status flags (**TP53+**, **A+**, and **MYC+**) during classification.
 
 ---
 

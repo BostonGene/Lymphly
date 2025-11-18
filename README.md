@@ -1,4 +1,4 @@
-# Lymphly: Data-driven Genetic Classifier for DLBCL
+# Lymphly: Interpretable Genetic Classifier for DLBCL
 ![Algorithm diagram and subtype classification schema](images/algorithm_and_subtypes.png)
 
 ---

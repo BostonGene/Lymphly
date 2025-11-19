@@ -160,7 +160,15 @@ This matrix is used to identify subtype-defining copy number alterations in spec
 
 Tab-separated file where rows represent chromosome arms and columns represent samples.
 
-Each cell contains an integer copy number call, indicating the relative copy number status of a chromosome arm compared to the sample’s baseline ploidy.
+Each cell contains an integer copy number call, indicating the relative copy number status of a chromosome arm compared to the sample’s ploidy.
+
+The ploidy is not fixed (e.g., typically 2) but is calculated specifically for each sample. It is typically determined using the weighted average of copy numbers across the genome:
+
+- For every segment in the sample, multiply its Total Copy Number by the segment's length.
+
+- Sum these values and divide by the total length of the genome.
+
+- The result is rounded to the nearest integer to define the sample's ploidy used in the scoring function.
 
 The cna-arm.tsv file is required to compute the arm-level aneuploidy status A+/–. If this file is not provided, the A+/– status cannot be calculated, and any downstream analyses depending on this metric will be unavailable.
 
@@ -174,11 +182,15 @@ This functionality is available for any cohort that includes arm-level CNA calls
 
 #### Expected values (example schema):
 
-- `0` — diploid (normal copy number, relative to the sample’s ploidy)
+- `0` — Neutral: The arm's copy number matches the sample's ploidy.
 
-- `1` or `2` — arm-level gain or high-level amplification
+- `-1` — Loss (Hemizygous Deletion): The arm is missing one copy relative to the ploidy. In a diploid sample (Ploidy ≈ 2), a Total Copy Number of 1 is a Loss (-1). In a tetraploid sample (Ploidy ≈ 4), a Total Copy Number of 3 is a Loss (-1).
 
-- `-1` or `-2` — arm-level loss or deletion
+- `-2` — Deletion (Homozygous/Deep Deletion): The arm is missing two copies relative to the sample's ploidy.
+
+- `1` — Gain: The arm has one extra copy compared to the ploidy.
+
+- `2` — Amplification: The arm has two or more extra copies (high-level amplification).
 
 This matrix is used to compute broad aneuploidy metrics, identify recurrent arm-level CNAs, and support subtype classification driven by chromosomal gains and losses.
 

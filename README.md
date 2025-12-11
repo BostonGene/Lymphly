@@ -16,7 +16,7 @@ DLBCL is a genetically and clinically heterogeneous disease. **Lymphly** is a tr
 - Additional flags for high-risk cases: TP53+, A+, MYC+ statuses
 - Integrated biological knowledge: derived from over 300 publications and 850 genomic events
 - Handles genetically composite cases
-- Compatible with whole-exome sequencing (WES) input
+- Compatible with whole-exome sequencing (WES) input, whole-genome sequencing (WGS), targeted panels, and circulating tumor DNA (ctDNA)
 
 ---
 

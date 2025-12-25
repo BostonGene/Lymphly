@@ -15,6 +15,13 @@ config = {
     'dependent_statuses': ['MYC+', 'TP53+', 'A+']
 }
 
+cna_groups = {
+    '10q23': ['FAS', 'PTEN'],
+    '18q21': ['BCL2', 'MALT1'],
+    '9p24': ['CD274', 'JAK2', 'PDCD1LG2'],
+    '20q11': ['ASXL1', 'DNMT3B']
+}
+
 variant_classification_groups = {
     'MISSENSE': ['Missense_Mutation', 'Intron', "3'UTR", "5'UTR"],
     'NONSENSE': ['Nonsense_Mutation'],
@@ -295,7 +302,7 @@ def check_cna_gene(cna_gene: pd.DataFrame, ann: pd.DataFrame, feature_table: pd.
 
     return cna_gene_filtered
 
-def find_features(feature_attrs, variant_classifications, maf=None, cna_gene=None, cna_arm=None, sample_annot=None, features_to_samples={}, ):
+def find_features(feature_attrs, variant_classifications, maf=None, cna_gene=None, cna_arm=None, sample_annot=None, features_to_samples={}, samples_seen_in_cna_group=None):
     """
     Identifies features in a mutation annotation file (MAF) based on a specific gene, its associated feature type, 
     and other relevant genomic data, and returns a list of features and associated samples.
@@ -367,9 +374,23 @@ def find_features(feature_attrs, variant_classifications, maf=None, cna_gene=Non
             else:
                 cna_type = [int(feature_attrs['CNA_type'])]
             samples_with_feature = cna_gene.loc[:, cna_gene.loc[gene].isin(cna_type)].columns.tolist()
+
+            group_name = None
+            for gname, genes in cna_groups.items():
+                if gene in genes:
+                    group_name = gname
+                    break
+
+            if group_name is not None:
+                new_samples = [s for s in samples_with_feature if s not in samples_seen_in_cna_group[group_name]]
+                samples_seen_in_cna_group[group_name].update(new_samples)
+                samples_with_feature = new_samples
+                feature_id = f'{group_name}_{feat_type}'
+            else:
+                feature_id = f'{gene}_{feat_type}'
         else:
             samples_with_feature = []
-        feature_id = f'{gene}_{feat_type}'
+            feature_id = f'{gene}_{feat_type}'
         
     # Handle hotspots or mutations (missense, nonsense, frameshifts)
     else:
@@ -805,7 +826,9 @@ def lymphly_classify(maf, cna_gene, cna_arm, annotation, feature_table, use_tran
 
     # Process each level (Core/Extended)
     for level in feature_levels:
-	
+
+        samples_seen_in_cna_group = {group: set() for group in cna_groups}
+        
         # Create table of features and subtypes
         feature_table_level = feature_table[feature_table.Level == level].copy()
         level_subtypes = get_unique_subtype(feature_table_level)
@@ -820,7 +843,8 @@ def lymphly_classify(maf, cna_gene, cna_arm, annotation, feature_table, use_tran
                                                                                cna_gene,
                                                                                cna_arm,
                                                                                annotation,
-                                                                               features_to_samples
+                                                                               features_to_samples,
+                                                                               samples_seen_in_cna_group=samples_seen_in_cna_group
                                                                                )
             subtype = feature_attrs['Subtype']
 

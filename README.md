@@ -228,6 +228,20 @@ The following are not allowed:
 
 ---
 
+#### CNA locus deduplication
+
+Some CNA features correspond to multiple genes located within the same recurrent genomic locus and therefore reflect a **single underlying copy number event** rather than independent alterations. To avoid double-counting, the following gene groups are **collapsed and counted as one CNA hit**:
+
+| Locus | Genes |
+|------|-------|
+| 10q23 | PTEN, FAS |
+| 18q21 | BCL2, MALT1 |
+| 9p24.1 | JAK2, CD274 (PD-L1), PDCD1LG2 (PD-L2) |
+| 20q11 | ASXL1, DNMT3B |
+
+If any gene in a group shows a CNA, the entire locus contributes **a single CNA event** to the subtype scoring.  
+This rule is applied only at the **feature-scoring stage**; the underlying `cna-arm.tsv` matrix is not modified.
+
 ### annotation.tsv — Annotation file
 
 The sample annotation file is a **tab-separated text file** containing exactly four columns:

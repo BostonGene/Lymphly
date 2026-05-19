@@ -10,10 +10,12 @@ from tqdm import tqdm
 
 config = {
     'feature_levels': ['Core', 'Extended'],
-    'abc_subtypes_order': ['MCD', 'BN2', 'JS3', 'N1'],
-    'gcb_subtypes_order': ['EZB', 'JS6'],
-    'main_abc_subtypes': ['MCD', 'BN2'],
-    'main_gcb_subtypes': ['EZB'],
+    'subtypes_order': ['N1', 'EZB', 'MCD', 'BN2', 'JS6', 'JS3'],
+    'allowed_composites': [
+        ['EZB', 'MCD'],
+        ['EZB', 'BN2'],
+        ['JS6', 'JS3']
+    ],
     'dependent_statuses': ['MYC+', 'TP53+', 'A+']
 }
 
@@ -480,10 +482,8 @@ def finalize_subtype(lymphly_table, mutated_genes, subtypes, use_statuses, **kwa
     If no classification can be made based on genes, it will check for the presence of statuses.
     If no subtypes or statuses are found, the sample is classified as 'Other'.
     """
-    abc_subtypes_order = kwargs.get('abc_subtypes_order')
-    gcb_subtypes_order = kwargs.get('gcb_subtypes_order')
-    main_abc_subtypes = kwargs.get('main_abc_subtypes')
-    main_gcb_subtypes = kwargs.get('main_gcb_subtypes')
+    subtypes_order = kwargs.get('subtypes_order')
+    allowed_composites = kwargs.get('allowed_composites')
     dependent_statuses = kwargs.get('dependent_statuses')
 
     lymphly_table_subtype = lymphly_table.copy()
@@ -628,30 +628,31 @@ def finalize_subtype(lymphly_table, mutated_genes, subtypes, use_statuses, **kwa
     
     ### Presence among core features
     for sample in lymphly_table_subtype[lymphly_table_subtype.Lymphly.isna()].index:
+        selected_subtype = None
         core_subtypes = mutated_unique_genes_subtypes['Core'][sample]
         if core_subtypes:
             gene_to_subtype_count = pd.Series(core_subtypes).value_counts()
             max_count = gene_to_subtype_count.max()
             top_values = gene_to_subtype_count[gene_to_subtype_count == max_count].index
             core_subtypes = [x for x in core_subtypes if x in top_values]
+            core_subtypes_set = set(core_subtypes)
             
-            abc_present = [s for s in abc_subtypes_order if s in core_subtypes]
-            gcb_present = [s for s in gcb_subtypes_order if s in core_subtypes]
-            if abc_present and not gcb_present:
-                selected_subtype = abc_present[0]
-            elif gcb_present and not abc_present:
-                selected_subtype = gcb_present[0]
-            elif abc_present and gcb_present:
-                abc_main = any(s in main_abc_subtypes for s in abc_present)
-                gcb_main = any(s in main_gcb_subtypes for s in gcb_present)
-                if abc_main and gcb_main:
-                    selected_subtype = [gcb_present[0],abc_present[0]]
-                elif abc_main and not gcb_main:
-                    selected_subtype = abc_present[0]
-                elif not abc_main and gcb_main:
-                    selected_subtype = gcb_present[0]
-                else:
-                    selected_subtype = [gcb_present[0],abc_present[0]]
+            top_hierarchy_subtype = None
+            for subtype in subtypes_order:
+                if subtype in core_subtypes_set:
+                    top_hierarchy_subtype = subtype
+                    break
+            if top_hierarchy_subtype is not None:
+                selected_subtype = top_hierarchy_subtype
+                for composite in allowed_composites:
+                    composite_set = set(composite)
+                    if (
+                        top_hierarchy_subtype in composite_set
+                        and composite_set.issubset(core_subtypes_set)
+                    ):
+                        selected_subtype = composite
+                        break
+
             if selected_subtype:
                 lymphly_table_subtype.loc[sample, 'Algorithm_Step'] = 'Hierarchy core'
                 lymphly_table_subtype.loc[sample, selected_subtype] = 'Yes'
@@ -664,30 +665,31 @@ def finalize_subtype(lymphly_table, mutated_genes, subtypes, use_statuses, **kwa
 
     ### Presence among extended features
     for sample in lymphly_table_subtype[lymphly_table_subtype.Lymphly.isna()].index:
+        selected_subtype = None
         extended_subtypes = mutated_unique_genes_subtypes['Extended'][sample]
         if extended_subtypes:
             gene_to_subtype_count = pd.Series(extended_subtypes).value_counts()
             max_count = gene_to_subtype_count.max()
             top_values = gene_to_subtype_count[gene_to_subtype_count == max_count].index
             extended_subtypes = [x for x in extended_subtypes if x in top_values]
-            
-            abc_present = [s for s in abc_subtypes_order if s in extended_subtypes]
-            gcb_present = [s for s in gcb_subtypes_order if s in extended_subtypes]
-            if abc_present and not gcb_present:
-                selected_subtype = abc_present[0]
-            elif gcb_present and not abc_present:
-                selected_subtype = gcb_present[0]
-            elif abc_present and gcb_present:
-                abc_main = any(s in main_abc_subtypes for s in abc_present)
-                gcb_main = any(s in main_gcb_subtypes for s in gcb_present)
-                if abc_main and gcb_main:
-                    selected_subtype = [gcb_present[0],abc_present[0]]
-                elif abc_main and not gcb_main:
-                    selected_subtype = abc_present[0]
-                elif not abc_main and gcb_main:
-                    selected_subtype = gcb_present[0]
-                else:
-                    selected_subtype = [gcb_present[0],abc_present[0]]
+            extended_subtypes_set = set(extended_subtypes)
+
+            top_hierarchy_subtype = None
+            for subtype in subtypes_order:
+                if subtype in extended_subtypes_set:
+                    top_hierarchy_subtype = subtype
+                    break
+            if top_hierarchy_subtype is not None:
+                selected_subtype = top_hierarchy_subtype
+                for composite in allowed_composites:
+                    composite_set = set(composite)
+                    if (
+                        top_hierarchy_subtype in composite_set
+                        and composite_set.issubset(extended_subtypes_set)
+                    ):
+                        selected_subtype = composite
+                        break
+
             if selected_subtype:
                 lymphly_table_subtype.loc[sample, 'Algorithm_Step'] = 'Hierarchy extended'
                 lymphly_table_subtype.loc[sample, selected_subtype] = 'Yes'
@@ -777,10 +779,8 @@ def lymphly_classify(maf, cna_gene, cna_arm, annotation, feature_table, use_tran
     - subtypes (list): List of all subtypes used in the classification.
     """
     feature_levels = kwargs.get('feature_levels', [])
-    abc_subtypes_order = kwargs.get('abc_subtypes_order')
-    gcb_subtypes_order = kwargs.get('gcb_subtypes_order')
-    main_abc_subtypes = kwargs.get('main_abc_subtypes')
-    main_gcb_subtypes = kwargs.get('main_gcb_subtypes')
+    subtypes_order = kwargs.get('subtypes_order')
+    allowed_composites = kwargs.get('allowed_composites')
     dependent_statuses = kwargs.get('dependent_statuses')
     arms_to_exclude = kwargs.get('arms_to_exclude')
 
